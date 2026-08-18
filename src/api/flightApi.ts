@@ -1,6 +1,10 @@
 import type { Flight, Booking, BookingRequest, AuthRequest, RegisterRequest, AuthResponse } from '../types';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+// ✅ Use environment variable with fallback for local development
+const API_BASE_URL = import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api`
+    : 'http://localhost:8080/api';
+
 const FLIGHTS_URL = `${API_BASE_URL}/flights`;
 const AUTH_URL = `${API_BASE_URL}/auth`;
 
@@ -93,5 +97,4 @@ export const flightApi = {
         });
         return handleResponse<void>(response);
     },
-
 };
