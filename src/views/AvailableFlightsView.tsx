@@ -1,49 +1,77 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { flightApi } from '../api/flightApi';
 import type { Flight } from '../types';
 import FlightCard from '../components/FlightCard';
 import BookingModal from '../components/BookingModal';
-import { CheckCircle, Search } from 'lucide-react';
-
+import { CheckCircle, Search, Loader2 } from 'lucide-react';
 
 const AvailableFlightsView = () => {
     const [flights, setFlights] = useState<Flight[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
-    const [notification, setNotification] = useState<string | null>(null); // Add state
+    const [notification, setNotification] = useState<string | null>(null);
+
     const [searchQuery, setSearchQuery] = useState('');
 
-    const fetchFlights = async () => {
+    // Pagination States
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+
+    const fetchFlights = useCallback(async (pageNum: number) => {
         try {
-            setLoading(true);
-            const data = await flightApi.getAvailableFlights();
-            setFlights(data);
+            if (pageNum === 0) setLoading(true);
+            else setLoadingMore(true);
+
+            const data = await flightApi.getAvailableFlights(pageNum, 50);
+            setFlights(prev => pageNum === 0 ? data.content : [...prev, ...data.content]);
+            setHasMore(!data.last);
         } catch (err) {
             setError('Failed to fetch available flights.');
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
-    };
-
-    useEffect(() => {
-        fetchFlights();
     }, []);
 
+    useEffect(() => {
+        fetchFlights(0);
+    }, [fetchFlights]);
 
-    // function to show notification for 3 seconds
+    useEffect(() => {
+        if (page > 0) {
+            fetchFlights(page);
+        }
+    }, [page, fetchFlights]);
+
     const handleNotify = (message: string) => {
         setNotification(message);
         setTimeout(() => setNotification(null), 3000);
     };
 
-    // useMemo to filter flights by destination city
     const filteredFlights = useMemo(() => {
         if (searchQuery.trim() === '') return flights;
         return flights.filter(flight =>
             flight.destination.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [flights, searchQuery]);
+
+    // Intersection Observer Logic
+    const observer = useRef<IntersectionObserver | null>(null);
+
+    const lastFlightRef = useCallback((node: HTMLDivElement) => {
+        if (loading || loadingMore) return;
+        if (observer.current) observer.current.disconnect();
+
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMore) {
+                setPage(prev => prev + 1);
+            }
+        });
+
+        if (node) observer.current.observe(node);
+    }, [loading, loadingMore, hasMore]);
 
     if (loading) return <div className="text-center text-gray-500 mt-10">Loading available flights...</div>;
     if (error) return <div className="text-center text-red-500 mt-10">{error}</div>;
@@ -52,11 +80,9 @@ const AvailableFlightsView = () => {
         <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Available Flights</h2>
 
-            {/* Notification Banner */}
             {notification && (
                 <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg flex items-center gap-2 z-50">
-                    <CheckCircle size={18} />
-                    {notification}
+                    <CheckCircle size={18} /> {notification}
                 </div>
             )}
 
@@ -69,7 +95,7 @@ const AvailableFlightsView = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search by destination city..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none"
                     />
                 </div>
             </div>
@@ -80,13 +106,25 @@ const AvailableFlightsView = () => {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredFlights.map((flight) => (
-                        <FlightCard
-                            key={flight.id}
-                            flight={flight}
-                            onBook={(f) => setSelectedFlight(f)}
-                        />
-                    ))}
+                    {filteredFlights.map((flight, index) => {
+                        if (index === filteredFlights.length - 1) {
+                            return (
+                                <div key={flight.id} ref={lastFlightRef}>
+                                    <FlightCard flight={flight} onBook={(f) => setSelectedFlight(f)} />
+                                </div>
+                            );
+                        } else {
+                            return (
+                                <FlightCard key={flight.id} flight={flight} onBook={(f) => setSelectedFlight(f)} />
+                            );
+                        }
+                    })}
+                </div>
+            )}
+
+            {loadingMore && (
+                <div className="text-center text-gray-400 mt-8 flex items-center justify-center gap-2 text-sm">
+                    <Loader2 size={16} className="animate-spin" /> Loading more flights...
                 </div>
             )}
 
@@ -94,7 +132,7 @@ const AvailableFlightsView = () => {
                 <BookingModal
                     flight={selectedFlight}
                     onClose={() => setSelectedFlight(null)}
-                    onSuccess={fetchFlights}
+                    onSuccess={() => fetchFlights(0)}
                     onNotify={handleNotify}
                 />
             )}
