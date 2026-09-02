@@ -47,3 +47,10 @@ export interface AuthResponse {
     email: string;
     role: Role;
 }
+
+export interface FlightPage {
+    content: Flight[];
+    last: boolean;
+    totalElements: number;
+    totalPages: number;
+}
