@@ -1,6 +1,27 @@
+# Dependencies
 node_modules/
-.package-lock.json # Optional: or keep package-lock.json
-node_modules/
-.package-lock.json
-node_modules/
+
+# Build outputs
+dist/
+build/
 .vite/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Lock files (optional - keep or remove based on preference)
+# package-lock.json  # Uncomment if you want to ignore it
+# yarn.lock
+# pnpm-lock.yaml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
