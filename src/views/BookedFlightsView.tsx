@@ -19,8 +19,11 @@ const BookedFlightsView = () => {
         const fetchBookedFlights = async () => {
             try {
                 setLoading(true);
-                const allFlights = await flightApi.getAllFlights();
-                const bookedOnly = allFlights.filter(flight => flight.status?.toUpperCase() === 'BOOKED');
+                // 1. Request page 0, size 1000 (so we get all booked flights to filter locally)
+                const data = await flightApi.getAllFlights(0, 1000);
+
+                // 2. Access data.content instead of just data
+                const bookedOnly = data.content.filter(flight => flight.status?.toUpperCase() === 'BOOKED');
                 setFlights(bookedOnly);
             } catch (err) {
                 setError('Failed to fetch booked flights.');
