@@ -15,7 +15,7 @@ const getSessionId = () => {
 const ChatWidget = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([
-        { role: 'assistant', content: "Hi! I'm FlyBooker AI. How can I help you with your flight booking today?" }
+        { role: 'assistant', content: "Hi! I'm Wavi. How can I help you with your flight booking today?" }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -60,7 +60,7 @@ const ChatWidget = () => {
                 >
                     <MessageCircle size={24} />
                     <span className="hidden group-hover:block absolute right-16 whitespace-nowrap bg-slate-800 text-white text-sm px-2 py-1 rounded-md">
-            Chat with FlyBooker AI
+            Chat with Wavi
           </span>
                 </button>
             )}
@@ -76,7 +76,7 @@ const ChatWidget = () => {
                                 <Bot size={20} />
                             </div>
                             <div>
-                                <h3 className="font-bold leading-none">FlyBooker AI</h3>
+                                <h3 className="font-bold leading-none">Wavi</h3>
                                 <p className="text-xs text-slate-300">Always here to help</p>
                             </div>
                         </div>
