@@ -7,7 +7,8 @@ import AvailableFlightsView from './views/AvailableFlightsView';
 import BookingsView from './views/BookingsView';
 import BookedFlightsView from './views/BookedFlightsView';
 import AuthView from './views/AuthView';
-import ProfileView from "./views/ProfileView.tsx";
+import ProfileView from './views/ProfileView';
+import ChatWidget from './components/ChatWidget';
 
 function App() {
     return (
@@ -26,6 +27,7 @@ function App() {
                         </Routes>
                     </main>
                     <Footer />
+                    <ChatWidget />
                 </div>
             </BrowserRouter>
         </AuthProvider>
