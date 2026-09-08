@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { chatApi } from '../api/chatApi';
 import { MessageCircle, X, Send, Loader2, Bot, User } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // Generate a random session ID for the user (or get from localStorage)
 const getSessionId = () => {
@@ -15,7 +17,7 @@ const getSessionId = () => {
 const ChatWidget = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([
-        { role: 'assistant', content: "Hi! I'm Wavi. How can I help you with your flight booking today?" }
+        { role: 'assistant', content: "Hi! I'm FlyBooker AI. How can I help you with your flight booking today?" }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -60,7 +62,7 @@ const ChatWidget = () => {
                 >
                     <MessageCircle size={24} />
                     <span className="hidden group-hover:block absolute right-16 whitespace-nowrap bg-slate-800 text-white text-sm px-2 py-1 rounded-md">
-            Chat with Wavi
+            Chat with FlyBooker AI
           </span>
                 </button>
             )}
@@ -76,7 +78,7 @@ const ChatWidget = () => {
                                 <Bot size={20} />
                             </div>
                             <div>
-                                <h3 className="font-bold leading-none">Wavi</h3>
+                                <h3 className="font-bold leading-none">FlyBooker AI</h3>
                                 <p className="text-xs text-slate-300">Always here to help</p>
                             </div>
                         </div>
@@ -99,7 +101,25 @@ const ChatWidget = () => {
                                         ? 'bg-slate-800 text-white rounded-br-none'
                                         : 'bg-white text-slate-800 border border-slate-100 rounded-bl-none'
                                 }`}>
-                                    {msg.content}
+                                    {/* Use ReactMarkdown for Assistant messages, plain text for User messages */}
+                                    {msg.role === 'assistant' ? (
+                                        <div className="prose prose-sm max-w-none flex flex-col">
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    // Custom styling for markdown elements inside the chat bubble
+                                                    p: ({node, ...props}) => <p style={{ margin: 0 }} {...props} />,
+                                                    ul: ({node, ...props}) => <ul style={{ margin: '0.5rem 0', paddingLeft: '1rem' }} {...props} />,
+                                                    li: ({node, ...props}) => <li style={{ marginTop: '0.25rem' }} {...props} />,
+                                                    strong: ({node, ...props}) => <strong className="font-bold text-slate-900" {...props} />
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </ReactMarkdown>
+                                        </div>
+                                    ) : (
+                                        msg.content
+                                    )}
                                 </div>
                                 {msg.role === 'user' && (
                                     <div className="bg-slate-300 p-1.5 rounded-full h-fit">
