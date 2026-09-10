@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { flightApi } from '../api/flightApi';
+import type { Flight } from '../types';
 import { Search, Trash2, AlertCircle, CheckCircle, Loader2, Plane, X, PlaneTakeoff, ShieldCheck } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import { useAuth } from '../context/AuthContext';
@@ -10,33 +11,27 @@ const BookingsView = () => {
     const isAdmin = role === 'ADMIN';
 
     const [searchEmail, setSearchEmail] = useState('');
-    const [bookings, setBookings] = useState<any[]>([]);
+    const [bookings, setBookings] = useState<Flight[]>([]);
     const [loading, setLoading] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [hasSearched, setHasSearched] = useState(false);
 
     // Admin local filter state
     const [adminSearchQuery, setAdminSearchQuery] = useState('');
 
-    // Pagination states (Used for User/Guest email search)
-    const [page, setPage] = useState(0);
-    const [hasMore, setHasMore] = useState(true);
-
     const [cancelingId, setCancelingId] = useState<number | null>(null);
     const [notification, setNotification] = useState<string | null>(null);
     const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
 
-    // --- Admin: Fetch ALL booked flights (Local pagination/filtering) ---
+    // --- Admin: Fetch ALL booked flights (Local filtering) ---
     const fetchAllBookedFlights = useCallback(async () => {
         setLoading(true);
         setError(null);
         setHasSearched(true);
         try {
-            // Admins need all flights to filter locally. We'll fetch a large page (e.g., 1000)
-            // If you have >1000 booked flights, a dedicated backend endpoint is needed.
+            // Fetch a large page of all flights to filter locally
             const data = await flightApi.getAllFlights(0, 1000);
-            const bookedOnly = data.content.filter((flight: any) => flight.status?.toUpperCase() === 'BOOKED');
+            const bookedOnly = data.content.filter((flight: Flight) => flight.status?.toUpperCase() === 'BOOKED');
             setBookings(bookedOnly);
         } catch (err) {
             setError('Failed to fetch all bookings.');
@@ -45,23 +40,18 @@ const BookingsView = () => {
         }
     }, []);
 
-    // --- User/Guest: Fetch bookings by email (Server-side pagination) ---
-    const fetchBookingsByEmail = useCallback(async (emailToSearch: string, pageNum: number) => {
+    // --- User/Guest: Fetch bookings by email (Simple List) ---
+    const fetchBookingsByEmail = useCallback(async (emailToSearch: string) => {
+        setLoading(true);
+        setError(null);
+        setHasSearched(true);
         try {
-            if (pageNum === 0) setLoading(true);
-            else setLoadingMore(true);
-
-            setError(null);
-            setHasSearched(true);
-
-            const data = await flightApi.getBookingsByEmail(emailToSearch.trim(), pageNum, 50);
-            setBookings(prev => pageNum === 0 ? data.content : [...prev, ...data.content]);
-            setHasMore(!data.last);
+            const data = await flightApi.getBookingsByEmail(emailToSearch.trim());
+            setBookings(data);
         } catch (err) {
             setError('Failed to fetch bookings. Please try again.');
         } finally {
             setLoading(false);
-            setLoadingMore(false);
         }
     }, []);
 
@@ -70,15 +60,9 @@ const BookingsView = () => {
             fetchAllBookedFlights();
         } else if (isAuthenticated && !isAdmin && email) {
             setSearchEmail(email);
-            fetchBookingsByEmail(email, 0);        }
-    }, [isAuthenticated, isAdmin, email, fetchAllBookedFlights, fetchBookingsByEmail]);
-
-    // Trigger next page fetch for User/Guest
-    useEffect(() => {
-        if (page > 0 && !isAdmin && searchEmail) {
-            fetchBookingsByEmail(searchEmail, page);
+            fetchBookingsByEmail(email);
         }
-    }, [page, isAdmin, searchEmail, fetchBookingsByEmail]);
+    }, [isAuthenticated, isAdmin, email, fetchAllBookedFlights, fetchBookingsByEmail]);
 
     // --- Admin Real-Time Filtering ---
     const displayedBookings = useMemo(() => {
@@ -96,8 +80,7 @@ const BookingsView = () => {
     const handleGuestSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!searchEmail) return;
-        setPage(0);
-        fetchBookingsByEmail(searchEmail, 0);
+        fetchBookingsByEmail(searchEmail);
     };
 
     const handleClearSearch = () => {
@@ -105,7 +88,6 @@ const BookingsView = () => {
         setBookings([]);
         setHasSearched(false);
         setError(null);
-        setPage(0);
     };
 
     const handleCancel = async () => {
@@ -128,20 +110,6 @@ const BookingsView = () => {
             setConfirmCancelId(null);
         }
     };
-
-    // Intersection Observer (For User/Guest pagination)
-    const observer = useRef<IntersectionObserver | null>(null);
-    const lastFlightRef = useCallback((node: HTMLDivElement) => {
-        if (loading || loadingMore || isAdmin) return;
-        if (observer.current) observer.current.disconnect();
-
-        observer.current = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting && hasMore) {
-                setPage(prev => prev + 1);
-            }
-        });
-        if (node) observer.current.observe(node);
-    }, [loading, loadingMore, hasMore, isAdmin]);
 
     const formatDate = (dateInput: string | string[] | number[] | undefined) => {
         if (!dateInput) return 'N/A';
@@ -226,72 +194,31 @@ const BookingsView = () => {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {displayedBookings.map((booking, index) => {
-                        // Attach observer only for User/Guest infinite scroll
-                        const isLast = index === displayedBookings.length - 1;
-                        if (isLast && !isAdmin) {
-                            return (
-                                <div key={booking.id} ref={lastFlightRef}>
-                                    <div className="bg-white rounded-lg shadow-md border border-slate-100 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="bg-cyan-50 p-3 rounded-full">
-                                                <Plane size={24} className="text-cyan-600 rotate-90" />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-slate-800">{booking.flightNumber}</h3>
-                                                <p className="text-sm text-slate-600">Destination: <span className="font-medium">{booking.destination}</span></p>
-                                                <p className="text-xs text-slate-500 mt-1">Departing: {formatDate(booking.departureTime)}</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-sm text-slate-600 md:text-right">
-                                            <p className="font-medium text-slate-800">{booking.passengerName}</p>
-                                            <p>{booking.passengerEmail}</p>
-                                            <p className="text-xs text-green-600 font-medium mt-1">Status: {booking.status}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => setConfirmCancelId(booking.id)}
-                                            className="text-red-600 border border-red-200 hover:bg-red-50 px-3 py-2 rounded-md transition-colors flex items-center gap-2 text-sm font-medium w-full md:w-auto justify-center"
-                                        >
-                                            <Trash2 size={16} /> Cancel Booking
-                                        </button>
-                                    </div>
+                    {displayedBookings.map((booking) => (
+                        <div key={booking.id} className="bg-white rounded-lg shadow-md border border-slate-100 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-cyan-50 p-3 rounded-full">
+                                    <Plane size={24} className="text-cyan-600 rotate-90" />
                                 </div>
-                            );
-                        } else {
-                            return (
-                                <div key={booking.id} className="bg-white rounded-lg shadow-md border border-slate-100 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="bg-cyan-50 p-3 rounded-full">
-                                            <Plane size={24} className="text-cyan-600 rotate-90" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-bold text-slate-800">{booking.flightNumber}</h3>
-                                            <p className="text-sm text-slate-600">Destination: <span className="font-medium">{booking.destination}</span></p>
-                                            <p className="text-xs text-slate-500 mt-1">Departing: {formatDate(booking.departureTime)}</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-sm text-slate-600 md:text-right">
-                                        <p className="font-medium text-slate-800">{booking.passengerName}</p>
-                                        <p>{booking.passengerEmail}</p>
-                                        <p className="text-xs text-green-600 font-medium mt-1">Status: {booking.status}</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setConfirmCancelId(booking.id)}
-                                        className="text-red-600 border border-red-200 hover:bg-red-50 px-3 py-2 rounded-md transition-colors flex items-center gap-2 text-sm font-medium w-full md:w-auto justify-center"
-                                    >
-                                        <Trash2 size={16} /> Cancel Booking
-                                    </button>
+                                <div>
+                                    <h3 className="font-bold text-slate-800">{booking.flightNumber}</h3>
+                                    <p className="text-sm text-slate-600">Destination: <span className="font-medium">{booking.destination}</span></p>
+                                    <p className="text-xs text-slate-500 mt-1">Departing: {formatDate(booking.departureTime)}</p>
                                 </div>
-                            );
-                        }
-                    })}
-                </div>
-            )}
-
-            {/* Bottom Loading Spinner for User/Guest */}
-            {loadingMore && !isAdmin && (
-                <div className="text-center text-gray-400 mt-8 flex items-center justify-center gap-2 text-sm">
-                    <Loader2 size={16} className="animate-spin" /> Loading more bookings...
+                            </div>
+                            <div className="text-sm text-slate-600 md:text-right">
+                                <p className="font-medium text-slate-800">{booking.passengerName}</p>
+                                <p>{booking.passengerEmail}</p>
+                                <p className="text-xs text-green-600 font-medium mt-1">Status: {booking.status}</p>
+                            </div>
+                            <button
+                                onClick={() => setConfirmCancelId(booking.id)}
+                                className="text-red-600 border border-red-200 hover:bg-red-50 px-3 py-2 rounded-md transition-colors flex items-center gap-2 text-sm font-medium w-full md:w-auto justify-center"
+                            >
+                                <Trash2 size={16} /> Cancel Booking
+                            </button>
+                        </div>
+                    ))}
                 </div>
             )}
 

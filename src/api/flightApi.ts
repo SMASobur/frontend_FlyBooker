@@ -1,4 +1,4 @@
-import type { Booking, BookingRequest, AuthRequest, RegisterRequest, AuthResponse, FlightPage } from '../types';
+import type {Booking, BookingRequest, AuthRequest, RegisterRequest, AuthResponse, FlightPage, Flight} from '../types';
 
 //  Use environment variable with fallback for local development
 const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -82,13 +82,12 @@ export const flightApi = {
     },
 
     // 4. Get bookings by email
-    getBookingsByEmail: async (email: string, page: number = 0, size: number = 50): Promise<FlightPage> => {
-        const response = await fetch(`${FLIGHTS_URL}/bookings?email=${encodeURIComponent(email)}&page=${page}&size=${size}`, {
+    getBookingsByEmail: async (email: string): Promise<Flight[]> => {
+        const response = await fetch(`${FLIGHTS_URL}/bookings?email=${encodeURIComponent(email)}`, {
             headers: { ...getAuthHeader() }
         });
-        return handleResponse<FlightPage>(response);
+        return handleResponse<Flight[]>(response);
     },
-
     // 5. Cancel a booking
     cancelBooking: async (flightId: number, email: string): Promise<void> => {
         const response = await fetch(`${FLIGHTS_URL}/${flightId}/cancel?email=${encodeURIComponent(email)}`, {
